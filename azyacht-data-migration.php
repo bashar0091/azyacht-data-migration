@@ -21,6 +21,7 @@ require_once plugin_dir_path(__FILE__) . 'includes/helper-function.php';
 require_once plugin_dir_path(__FILE__) . 'includes/ajax/existing-data-delete.php';
 require_once plugin_dir_path(__FILE__) . 'includes/ajax/upload-csv.php';
 require_once plugin_dir_path(__FILE__) . 'includes/ajax/helper-ajax.php';
+require_once plugin_dir_path(__FILE__) . 'includes/ajax/csv-migration.php';
 
 /**
  * CSS and JS added
@@ -110,7 +111,7 @@ function data_migration_content()
                     return pathinfo($file, PATHINFO_EXTENSION) === 'csv';
                 });
             ?>
-                <form action="">
+                <form action="" class="migrate_csv_form">
                     <table>
                         <tr>
                             <td>
@@ -129,7 +130,8 @@ function data_migration_content()
                                         ?>
                                     </p>
                                     <div>
-                                        <button type="button" class="button button-primary test_csv_btn">Test Csv</button>
+                                        <button type="button" class="button button-primary test_csv_btn">Test CSV</button>
+                                        <button type="Submit" class="button button-primary">Migrate CSV</button>
                                         <div><b class="reloading_text"></b></div>
                                     </div>
                                 </label>

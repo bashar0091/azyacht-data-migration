@@ -239,4 +239,41 @@ jQuery(document).ready(function ($) {
       },
     });
   });
+
+  // migrate_csv_form
+  $(document).on("submit", ".migrate_csv_form", function (e) {
+    e.preventDefault();
+    var t = $(this);
+
+    // Initialize FormData properly
+    var formData = new FormData(this);
+    formData.append("action", "migrate_csv_handler");
+    isAjaxRunning = true;
+
+    if (
+      confirm(
+        "❗ ⚠️Are you sure you want Migrate this table, before migrate please backup your database"
+      )
+    ) {
+      if (confirm("⚠️ Please backup you database")) {
+        $.ajax({
+          type: "POST",
+          url: dataAjax.ajaxurl,
+          data: formData,
+          processData: false,
+          contentType: false,
+          success: function (response) {
+            console.log("Success:", response);
+            isAjaxRunning = false;
+          },
+          error: function (error) {
+            console.log("Error:", error);
+          },
+          complete: function () {
+            isAjaxRunning = false;
+          },
+        });
+      }
+    }
+  });
 });
