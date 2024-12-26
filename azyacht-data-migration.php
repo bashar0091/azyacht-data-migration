@@ -72,8 +72,20 @@ function data_migration_content()
 
 
         <?php
-        migration_form_render('Data Migration CSV', $csv_folder_path, 'csv');
-        migration_form_render('Data Migration JSON', $json_folder_path, 'json');
+        if (file_exists($main_folder_path)) {
+            migration_form_render('Data Migration CSV', $csv_folder_path, 'csv');
+            migration_form_render('Data Migration JSON', $json_folder_path, 'json');
+        ?>
+
+            <div style="margin-top: 50px;">
+                <h3>User Migration</h3>
+                <form action="" class="user_migration_form">
+                    <button type="button" class="button button-primary">Create Column</button>
+                    <button type="button" class="button button-primary">Migrate User</button>
+                </form>
+            </div>
+        <?php
+        }
         ?>
     </div>
 <?php
