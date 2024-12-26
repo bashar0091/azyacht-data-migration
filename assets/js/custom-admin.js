@@ -1,104 +1,33 @@
 jQuery(document).ready(function ($) {
   // ===
   let isAjaxRunning = false;
-
-  function delete_data_ajax(selector = "", action = "", posttype = "") {
-    $(document).on("submit", selector, function (e) {
-      e.preventDefault();
-      var t = $(this);
-
-      if (
-        confirm(
-          "❗ ⚠️Are you sure you want to delete this? All data will be lost and cannot be restored."
-        )
-      )
-        if (confirm("⚠️ Please backup first, If you delete data by mistake")) {
-          t.find(".reloading_text").html(
-            `<span style="color:red;">Delete in Progress... This will take time, Don't Close this window or browser</span>`
-          );
-          t.find("button").text("Deleting...");
-          isAjaxRunning = true;
-          $.ajax({
-            url: dataAjax.ajaxurl,
-            type: "POST",
-            data: {
-              action: action,
-              posttype: posttype,
-            },
-            success: function (response) {
-              if (response.success) {
-                t.find(".reloading_text").html(
-                  `<span style="color:green;">${response.data.message} <u><a href="">Reload Window</a></u></span>`
-                );
-                t.find("button").text("Delete");
-              }
-            },
-            error: function (error) {
-              console.error("Error:", error);
-            },
-            complete: function () {
-              isAjaxRunning = false;
-            },
-          });
-        }
-    });
-  }
-  delete_data_ajax(".existing_candidate_delete", "delete_existing_candidate");
-  delete_data_ajax(
-    ".existing_company_delete",
-    "delete_existing_posttypedata",
-    "company"
-  );
-  delete_data_ajax(
-    ".existing_job_delete",
-    "delete_existing_posttypedata",
-    "jobs"
-  );
-  delete_data_ajax(
-    ".existing_email_delete",
-    "delete_existing_posttypedata",
-    "email-log"
-  );
-  delete_data_ajax(
-    ".existing_notification_delete",
-    "delete_existing_posttypedata",
-    "notification"
-  );
-
   //   prevent browser reload
   $(window).on("beforeunload", function () {
     if (isAjaxRunning) {
-      return "❗⚠️ Deletion is in progress. If you leave this page, the operation might be interrupted and cause issues.";
+      return "❗⚠️ If you leave this page, the operation might be interrupted and cause issues.";
     }
   });
 
-  // upload all csv file
-  $(document).on("submit", ".upload_all_file_form", function (e) {
+  $(document).on("submit", ".generate_core_folder", function (e) {
     e.preventDefault();
     var t = $(this);
-    const files = t.find('input[name="upload_allcsv_file[]"]')[0].files;
-    const formData = new FormData();
-    $.each(files, function (i, file) {
-      formData.append("upload_allcsv_file[]", file);
-    });
-    formData.append("action", "upload_all_file_handler");
     t.find(".reloading_text").html(
-      `<span style="color:red;">Save in Progress... This will take time, Don't Close this window or browser</span>`
+      `<span style="color:red;">Folder Generating... This will take time, Don't Close this window or browser</span>`
     );
-    t.find("button").text("Saving...");
+    t.find("button").text("Generating...");
     isAjaxRunning = true;
     $.ajax({
       url: dataAjax.ajaxurl,
       type: "POST",
-      data: formData,
-      processData: false,
-      contentType: false,
+      data: {
+        action: "generate_core_folder_handler",
+      },
       success: function (response) {
         if (response.success) {
           t.find(".reloading_text").html(
-            `<span style="color:green;">File Saved Successfully on server <u><a href="">Reload Window</a></u></span>`
+            `<span style="color:green;">${response.data.message} <u><a href="">Reload Window</a></u></span>`
           );
-          t.find("button").text("Save File to Server");
+          t.find("button").text("Generate");
           isAjaxRunning = false;
           location.reload();
         }
@@ -111,11 +40,11 @@ jQuery(document).ready(function ($) {
       },
     });
   });
-  $(document).on("submit", ".delete_all_file_form", function (e) {
+  $(document).on("submit", ".delete_core_folder", function (e) {
     e.preventDefault();
     var t = $(this);
     t.find(".reloading_text").html(
-      `<span style="color:red;">Delete CSV Folder in Progress... This will take time, Don't Close this window or browser</span>`
+      `<span style="color:red;">Folder Deleting... This will take time, Don't Close this window or browser</span>`
     );
     t.find("button").text("Deleting...");
     isAjaxRunning = true;
@@ -123,14 +52,14 @@ jQuery(document).ready(function ($) {
       url: dataAjax.ajaxurl,
       type: "POST",
       data: {
-        action: "delete_csv_file_handler",
+        action: "delete_core_folder_handler",
       },
       success: function (response) {
         if (response.success) {
           t.find(".reloading_text").html(
-            `<span style="color:green;">File Deleted Successfully <u><a href="">Reload Window</a></u></span>`
+            `<span style="color:green;">${response.data.message} <u><a href="">Reload Window</a></u></span>`
           );
-          t.find("button").text("Delete CSV Folder");
+          t.find("button").text("Deleting");
           isAjaxRunning = false;
           location.reload();
         }
@@ -148,9 +77,12 @@ jQuery(document).ready(function ($) {
   $(document).on("click", ".test_csv_btn", function (e) {
     e.preventDefault();
     var t = $(this);
-    var csv_file = $("#csv_file");
+    var fileType = t.find('input[name="file_type"]').val();
+    var csv_file_name = t
+      .closest(".migrate_csv_form")
+      .find('select[name="file_name"]')
+      .val();
     var csv_viewer = $(".csv_viewer");
-    var csv_file_name = csv_file.val();
     t.parent()
       .find(".reloading_text")
       .html(
@@ -244,36 +176,33 @@ jQuery(document).ready(function ($) {
   $(document).on("submit", ".migrate_csv_form", function (e) {
     e.preventDefault();
     var t = $(this);
-
-    // Initialize FormData properly
     var formData = new FormData(this);
-    formData.append("action", "migrate_csv_handler");
-    isAjaxRunning = true;
+    formData.append("action", "migrate_file_handler");
 
-    if (
-      confirm(
-        "❗ ⚠️Are you sure you want Migrate this table, before migrate please backup your database"
-      )
-    ) {
-      if (confirm("⚠️ Please backup you database")) {
-        $.ajax({
-          type: "POST",
-          url: dataAjax.ajaxurl,
-          data: formData,
-          processData: false,
-          contentType: false,
-          success: function (response) {
-            console.log("Success:", response);
+    if (confirm("⚠️ Please backup your database before migrating.")) {
+      t.find(".reloading_text").html(
+        `<span style="color:red;">Migrating... This will take time, Don't Close this window or browser</span>`
+      );
+      isAjaxRunning = true;
+      $.ajax({
+        type: "POST",
+        url: dataAjax.ajaxurl,
+        data: formData,
+        processData: false,
+        contentType: false,
+        success: function (response) {
+          if (response.success) {
+            t.find(".reloading_text").html(
+              `<span style="color:green;">Migrated Successfully <u><a href="">Reload Window</a></u></span>`
+            );
             isAjaxRunning = false;
-          },
-          error: function (error) {
-            console.log("Error:", error);
-          },
-          complete: function () {
-            isAjaxRunning = false;
-          },
-        });
-      }
+            location.reload();
+          }
+        },
+        error: function (error) {
+          alert("An unexpected error occurred.");
+        },
+      });
     }
   });
 });

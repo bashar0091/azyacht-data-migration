@@ -1,5 +1,54 @@
 <?php
 
+function generate_core_folder_handler()
+{
+    $main_folder = 'yacht-data';
+    $csv_folder = 'csv';
+    $json_folder = 'json';
+    $upload_dir = wp_upload_dir();
+    $main_folder_path = $upload_dir['basedir'] . '/' . $main_folder;
+    $csv_folder_path = $main_folder_path . '/' . $csv_folder;
+    $json_folder_path = $main_folder_path . '/' . $json_folder;
+    mkdir($main_folder_path, 0755, true);
+    mkdir($csv_folder_path, 0755, true);
+    mkdir($json_folder_path, 0755, true);
+    wp_send_json_success(['message' => 'Folders Created Successfully']);
+    wp_die();
+}
+
+add_action('wp_ajax_generate_core_folder_handler', 'generate_core_folder_handler');
+
+// ==============
+function delete_core_folder_handler()
+{
+    $main_folder = 'yacht-data';
+    $csv_folder = 'csv';
+    $json_folder = 'json';
+    $upload_dir = wp_upload_dir();
+    $main_folder_path = $upload_dir['basedir'] . '/' . $main_folder;
+    function delete_folder($folder_path)
+    {
+        if (is_dir($folder_path)) {
+            $files = array_diff(scandir($folder_path), array('.', '..'));
+            foreach ($files as $file) {
+                $file_path = $folder_path . '/' . $file;
+                is_dir($file_path) ? delete_folder($file_path) : unlink($file_path);
+            }
+            rmdir($folder_path);
+        }
+    }
+    if (file_exists($main_folder_path)) {
+        delete_folder($main_folder_path);
+    }
+    wp_send_json_success(['message' => 'Folders Deleted Successfully']);
+    wp_die();
+}
+
+add_action('wp_ajax_delete_core_folder_handler', 'delete_core_folder_handler');
+
+
+
+// ========
 function show_csv_handler()
 {
     // Get the CSV file name from the request
@@ -12,12 +61,14 @@ function show_csv_handler()
     }
 
     // Get the upload directory and set the target CSV directory
+    $main_folder = 'yacht-data';
+    $csv_folder = 'csv';
     $upload_dir = wp_upload_dir();
-    $subdir = 'csv-data';
-    $target_dir = $upload_dir['basedir'] . '/' . $subdir;
+    $main_folder_path = $upload_dir['basedir'] . '/' . $main_folder;
+    $csv_folder_path = $main_folder_path . '/' . $csv_folder;
 
     // Ensure the CSV file exists
-    $csv_file_path = $target_dir . '/' . $csv_file_name;
+    $csv_file_path = $csv_folder_path . '/' . $csv_file_name;
     if (!file_exists($csv_file_path)) {
         wp_send_json_error(['message' => 'CSV file not found.']);
         wp_die();

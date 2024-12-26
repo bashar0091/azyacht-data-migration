@@ -1,271 +1,108 @@
 <?php
-add_action('wp_ajax_migrate_csv_handler', 'migrate_csv_handler');
-function migrate_csv_handler()
+add_action('wp_ajax_migrate_file_handler', 'migrate_file_handler');
+function migrate_file_handler()
 {
     global $wpdb;
 
-    // Get the CSV file name from the request and sanitize it
-    $csv_file = isset($_POST['csv_file']) ? sanitize_text_field($_POST['csv_file']) : '';
+    $file_type = sanitize_text_field($_POST['file_type'] ?? '');
+    $file_name = sanitize_text_field($_POST['file_name'] ?? '');
+    $table_name = sanitize_text_field($_POST['database_table_name'] ?? '');
 
-    if (!empty($csv_file)) {
-        // Trim extra spaces and normalize the file name
-        $csv_file = trim($csv_file);
+    // Add WordPress table prefix
+    $table_name = $wpdb->prefix . $table_name;
 
-        // Remove the .csv extension and sanitize the table name
-        $base_name = preg_replace('/\.csv$/i', '', $csv_file);
-        $sanitized_name = preg_replace('/[^a-zA-Z0-9_-]/', '', $base_name);
-
-        // Create the final table name without adding an extra 'wp_' prefix
-        $table_name = $wpdb->prefix . $sanitized_name;
-
-        // Define the target file path
-        $upload_dir = wp_upload_dir();
-        $subdir = 'csv-data';
-        $target_dir = $upload_dir['basedir'] . '/' . $subdir;
-        $csv_path = $target_dir . '/' . $csv_file;
-
-        // Check if the CSV file exists
-        if (!file_exists($csv_path)) {
-            wp_send_json_error('CSV file not found.', 404);
-        }
-
-        // Read the CSV file
-        $csv_data = array_map('str_getcsv', file($csv_path));
-        if (empty($csv_data)) {
-            wp_send_json_error('CSV file is empty or invalid.', 400);
-        }
-
-        // Extract the headers from the first row
-        $headers = array_map(function ($header) {
-            return preg_replace('/[^a-zA-Z0-9_]/', '_', strtolower(trim($header)));
-        }, $csv_data[0]);
-
-        // Ensure table exists
-        $charset_collate = $wpdb->get_charset_collate();
-        if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") !== $table_name) {
-            // Build SQL columns from headers
-            $columns = array_map(function ($header) {
-                return "`$header` text";
-            }, $headers);
-
-            $sql = "CREATE TABLE $table_name (
-                id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-                " . implode(', ', $columns) . ",
-                PRIMARY KEY (id)
-            ) $charset_collate;";
-
-            require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-            dbDelta($sql);
-        }
-
-        // Truncate the table (clear all existing data)
-        $wpdb->query("TRUNCATE TABLE $table_name");
-
-        // Check for missing columns and add them
-        $existing_columns = $wpdb->get_col("DESCRIBE $table_name", 0); // Get existing column names
-        $missing_columns = array_diff($headers, $existing_columns);
-
-        foreach ($missing_columns as $missing_column) {
-            $wpdb->query("ALTER TABLE $table_name ADD `$missing_column` text");
-        }
-
-        // Insert data into the table
-        for ($i = 1; $i < count($csv_data); $i++) {
-            $row = array_combine($headers, $csv_data[$i]);
-
-            // Ensure only valid columns are inserted
-            $filtered_row = array_filter($row, function ($key) use ($existing_columns) {
-                return in_array($key, $existing_columns);
-            }, ARRAY_FILTER_USE_KEY);
-
-            $wpdb->insert($table_name, $filtered_row);
-        }
-
-        wp_send_json_success("Table '$sanitized_name' flushed and data inserted successfully.");
+    // Process file based on type (CSV or JSON)
+    if ($file_type === 'csv') {
+        process_csv_file($file_name, $table_name);
+    } elseif ($file_type === 'json') {
+        process_json_file($file_name, $table_name);
+    } else {
+        wp_send_json_error("Invalid file type.");
     }
+    wp_send_json_success(['message' => 'Migrated Successfully']);
 
     wp_die();
 }
 
+function process_csv_file($file_name, $table_name)
+{
+    global $wpdb;
 
+    $upload_dir = wp_upload_dir();
+    $csv_file_path = $upload_dir['basedir'] . '/yacht-data/csv/' . $file_name;
 
+    if (!file_exists($csv_file_path)) {
+        wp_send_json_error("CSV file not found.");
+    }
 
-// =======================================================================
-// add_action('wp_ajax_migrate_csv_handler', 'migrate_csv_handler');
-// function migrate_csv_handler()
-// {
-//     global $wpdb;
+    $file = fopen($csv_file_path, 'r');
+    if (!$file) {
+        wp_send_json_error("Unable to open the CSV file.");
+    }
 
-//     // Get the CSV file name from the request and sanitize it
-//     $csv_file = isset($_POST['csv_file']) ? sanitize_text_field($_POST['csv_file']) : '';
+    $headers = fgetcsv($file);
 
-//     if (!empty($csv_file)) {
-//         // Trim extra spaces and normalize the file name
-//         $csv_file = trim($csv_file);
+    // Check if table exists, and delete it if it does
+    $wpdb->query("DROP TABLE IF EXISTS `$table_name`");
 
-//         // Remove the .csv extension and sanitize the table name
-//         $base_name = preg_replace('/\.csv$/i', '', $csv_file);
-//         $sanitized_name = preg_replace('/[^a-zA-Z0-9_-]/', '', $base_name);
+    // Create table with unique_id as BIGINT primary key
+    $columns = ["`unique_id` BIGINT(20) NOT NULL AUTO_INCREMENT PRIMARY KEY"];
+    foreach ($headers as $header) {
+        $columns[] = "`$header` LONGTEXT";
+    }
 
-//         // Create the final table name without adding an extra 'wp_' prefix
-//         $table_name = $wpdb->prefix . $sanitized_name;
+    // Create table with the unique_id column
+    $create_table_sql = "CREATE TABLE `$table_name` (" . implode(", ", $columns) . ")";
+    $wpdb->query($create_table_sql);
 
-//         // Define the target file path
-//         $upload_dir = wp_upload_dir();
-//         $subdir = 'csv-data';
-//         $target_dir = $upload_dir['basedir'] . '/' . $subdir;
-//         $csv_path = $target_dir . '/' . $csv_file;
+    // Insert CSV data into the table
+    while ($row = fgetcsv($file)) {
+        $data = array_combine($headers, $row);
+        $wpdb->insert($table_name, $data);
+    }
 
-//         // Check if the CSV file exists
-//         if (!file_exists($csv_path)) {
-//             wp_send_json_error('CSV file not found.', 404);
-//         }
+    fclose($file);
 
-//         // Read the CSV file
-//         $csv_data = array_map('str_getcsv', file($csv_path));
-//         if (empty($csv_data)) {
-//             wp_send_json_error('CSV file is empty or invalid.', 400);
-//         }
+    wp_send_json_success("Data successfully inserted into `$table_name`.");
+}
 
-//         // Extract the headers from the first row
-//         $headers = array_map(function ($header) {
-//             return preg_replace('/[^a-zA-Z0-9_]/', '_', strtolower(trim($header)));
-//         }, $csv_data[0]);
+function process_json_file($file_name, $table_name)
+{
+    global $wpdb;
 
-//         // Ensure table exists
-//         $charset_collate = $wpdb->get_charset_collate();
-//         if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") !== $table_name) {
-//             // Build SQL columns from headers
-//             $columns = array_map(function ($header) {
-//                 return "`$header` text";
-//             }, $headers);
+    $upload_dir = wp_upload_dir();
+    $json_file_path = $upload_dir['basedir'] . '/yacht-data/json/' . $file_name;
 
-//             $sql = "CREATE TABLE $table_name (
-//                 id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-//                 " . implode(', ', $columns) . ",
-//                 PRIMARY KEY (id)
-//             ) $charset_collate;";
+    if (!file_exists($json_file_path)) {
+        wp_send_json_error("JSON file not found.");
+    }
 
-//             require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-//             dbDelta($sql);
-//         }
+    $json_data = file_get_contents($json_file_path);
+    $data_array = json_decode($json_data, true);
 
-//         // Truncate the table (clear all existing data)
-//         $wpdb->query("TRUNCATE TABLE $table_name");
+    if ($data_array === null) {
+        wp_send_json_error("Invalid JSON data.");
+    }
 
-//         // Check for missing columns and add them
-//         $existing_columns = $wpdb->get_col("DESCRIBE $table_name", 0); // Get existing column names
-//         $missing_columns = array_diff($headers, $existing_columns);
+    $headers = array_keys($data_array[0]);
 
-//         foreach ($missing_columns as $missing_column) {
-//             $wpdb->query("ALTER TABLE $table_name ADD `$missing_column` text");
-//         }
+    // Check if table exists, and delete it if it does
+    $wpdb->query("DROP TABLE IF EXISTS `$table_name`");
 
-//         // Insert data into the table
-//         for ($i = 1; $i < count($csv_data); $i++) {
-//             // Ensure row matches the number of headers
-//             if (count($headers) === count($csv_data[$i])) {
-//                 $row = array_combine($headers, $csv_data[$i]);
+    // Create table with unique_id as BIGINT primary key
+    $columns = ["`unique_id` BIGINT(20) NOT NULL AUTO_INCREMENT PRIMARY KEY"];
+    foreach ($headers as $header) {
+        $columns[] = "`$header` LONGTEXT";
+    }
 
-//                 // Ensure only valid columns are inserted
-//                 $filtered_row = array_filter($row, function ($key) use ($existing_columns) {
-//                     return in_array($key, $existing_columns);
-//                 }, ARRAY_FILTER_USE_KEY);
+    // Create table with the unique_id column
+    $create_table_sql = "CREATE TABLE `$table_name` (" . implode(", ", $columns) . ")";
+    $wpdb->query($create_table_sql);
 
-//                 $wpdb->insert($table_name, $filtered_row);
-//             } else {
-//                 error_log('Row skipped due to mismatched column count: ' . print_r($csv_data[$i], true));
-//             }
-//         }
+    // Insert JSON data into the table
+    foreach ($data_array as $data) {
+        $wpdb->insert($table_name, $data);
+    }
 
-//         wp_send_json_success("Table '$sanitized_name' flushed and data inserted successfully.");
-//     }
-
-//     wp_die();
-// }
-
-
-
-
-// =======================================================================
-
-// add_action('wp_ajax_migrate_csv_handler', 'migrate_csv_handler');
-// function migrate_csv_handler()
-// {
-//     global $wpdb;
-
-//     $csv_file = isset($_POST['csv_file']) ? sanitize_text_field($_POST['csv_file']) : '';
-
-//     if (!empty($csv_file)) {
-//         $csv_file = trim($csv_file);
-//         $base_name = preg_replace('/\.csv$/i', '', $csv_file);
-//         $sanitized_name = preg_replace('/[^a-zA-Z0-9_-]/', '', $base_name);
-//         $table_name = $wpdb->prefix . $sanitized_name;
-
-//         $upload_dir = wp_upload_dir();
-//         $subdir = 'csv-data';
-//         $target_dir = $upload_dir['basedir'] . '/' . $subdir;
-//         $csv_path = $target_dir . '/' . $csv_file;
-
-//         if (!file_exists($csv_path)) {
-//             wp_send_json_error('CSV file not found.', 404);
-//         }
-
-//         $csv_data = array_map('str_getcsv', file($csv_path));
-//         if (empty($csv_data)) {
-//             wp_send_json_error('CSV file is empty or invalid.', 400);
-//         }
-
-//         $headers = array_map(function ($header) {
-//             return preg_replace('/[^a-zA-Z0-9_]/', '_', strtolower(trim($header)));
-//         }, $csv_data[0]);
-
-//         $charset_collate = $wpdb->get_charset_collate();
-//         if ($wpdb->get_var("SHOW TABLES LIKE '$table_name'") !== $table_name) {
-//             $columns = array_map(function ($header) {
-//                 return "`$header` text";
-//             }, $headers);
-
-//             $sql = "CREATE TABLE $table_name (
-//                 id bigint(20) unsigned NOT NULL AUTO_INCREMENT,
-//                 " . implode(', ', $columns) . ",
-//                 PRIMARY KEY (id)
-//             ) $charset_collate;";
-
-//             require_once(ABSPATH . 'wp-admin/includes/upgrade.php');
-//             dbDelta($sql);
-//         }
-
-//         $wpdb->query("TRUNCATE TABLE $table_name");
-
-//         $existing_columns = $wpdb->get_col("DESCRIBE $table_name", 0);
-//         $missing_columns = array_diff($headers, $existing_columns);
-
-//         foreach ($missing_columns as $missing_column) {
-//             $wpdb->query("ALTER TABLE $table_name ADD `$missing_column` text");
-//         }
-
-//         for ($i = 1; $i < count($csv_data); $i++) {
-//             $row = $csv_data[$i];
-
-//             // Handle mismatched column counts
-//             if (count($row) < count($headers)) {
-//                 $row = array_pad($row, count($headers), null); // Pad missing values
-//             } elseif (count($row) > count($headers)) {
-//                 $row = array_slice($row, 0, count($headers)); // Trim extra values
-//             }
-
-//             $row = array_combine($headers, $row);
-
-//             $filtered_row = array_filter($row, function ($key) use ($existing_columns) {
-//                 return in_array($key, $existing_columns);
-//             }, ARRAY_FILTER_USE_KEY);
-
-//             $wpdb->insert($table_name, $filtered_row);
-//         }
-
-//         wp_send_json_success("Table '$sanitized_name' flushed and data inserted successfully.");
-//     }
-
-//     wp_die();
-// }
+    wp_send_json_success("Data successfully inserted into `$table_name`.");
+}

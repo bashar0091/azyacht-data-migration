@@ -18,8 +18,6 @@ defined('ABSPATH') || exit;
  * Require files
  */
 require_once plugin_dir_path(__FILE__) . 'includes/helper-function.php';
-require_once plugin_dir_path(__FILE__) . 'includes/ajax/existing-data-delete.php';
-require_once plugin_dir_path(__FILE__) . 'includes/ajax/upload-csv.php';
 require_once plugin_dir_path(__FILE__) . 'includes/ajax/helper-ajax.php';
 require_once plugin_dir_path(__FILE__) . 'includes/ajax/csv-migration.php';
 
@@ -55,96 +53,28 @@ function custom_admin_menu()
 
 function data_migration_content()
 {
+    $main_folder = 'yacht-data';
+    $csv_folder = 'csv';
+    $json_folder = 'json';
     $upload_dir = wp_upload_dir();
-    $subdir = 'csv-data';
-    $target_dir = $upload_dir['basedir'] . '/' . $subdir;
+    $main_folder_path = $upload_dir['basedir'] . '/' . $main_folder;
+    $csv_folder_path = $main_folder_path . '/' . $csv_folder;
+    $json_folder_path = $main_folder_path . '/' . $json_folder;
 ?>
     <div class="wrap">
         <h3 style="color: red;"><b>Please Backup your <u>database</u>, If you restore deleted item in future.</b></h3>
-        <?php render_table('Candidate', 'Delete', 'existing_candidate_delete'); ?>
-        <?php render_table('Company', 'Delete', 'existing_company_delete'); ?>
-        <?php render_table('Job', 'Delete', 'existing_job_delete'); ?>
-        <?php render_table('Email', 'Delete', 'existing_email_delete'); ?>
-        <?php render_table('Notification', 'Delete', 'existing_notification_delete'); ?>
 
-        <div>
-            <h3>Data Save on Server</h3>
-            <?php
-            if (!file_exists($target_dir)) {
-            ?>
-                <form action="" class="upload_all_file_form" enctype="multipart/form-data">
-                    <div>
-                        <label>
-                            Upload All Csv File
-                            <input type="file" name="upload_allcsv_file[]" accept=".csv" multiple required>
-                        </label>
-                    </div>
-                    <div>
-                        <button type="submit" class="button button-primary">Save File to Server</button>
-                    </div>
-                    <div><b class="reloading_text"></b></div>
-                </form>
-            <?php
-            } else {
-            ?>
-                <form action="" class="delete_all_file_form">
-                    <div>
-                        <button type="submit" class="button button-primary" style="background:red;">Delete CSV Folder</button>
-                    </div>
-                    <div><b class="reloading_text"></b></div>
-                </form>
-            <?php
-            }
-            ?>
+        <?php if (!file_exists($main_folder_path)) : ?>
+            <?php render_table('Generate Core Folder', 'Generate', 'generate_core_folder'); ?>
+        <?php else : ?>
+            <?php render_table('Folder Generated [' . $main_folder_path . ']', 'Delete', 'delete_core_folder'); ?>
+        <?php endif; ?>
 
-        </div>
 
-        <div style="margin-top: 50px;">
-            <h3>Data Migration</h3>
-            <?php
-            if (file_exists($target_dir)) {
-                // Get all CSV files in the directory
-                $csv_files = array_diff(scandir($target_dir), array('..', '.'));
-
-                // Filter out files that are not CSV
-                $csv_files = array_filter($csv_files, function ($file) {
-                    return pathinfo($file, PATHINFO_EXTENSION) === 'csv';
-                });
-            ?>
-                <form action="" class="migrate_csv_form">
-                    <table>
-                        <tr>
-                            <td>
-                                <label>
-                                    <p>CSV File</p>
-                                    <p>
-                                        <?php
-                                        if (!empty($csv_files)) {
-                                            echo '<select name="csv_file" id="csv_file" required>';
-                                            echo '<option>Select CSV</option>';
-                                            foreach ($csv_files as $file) {
-                                                echo '<option value="' . esc_attr($file) . '">' . esc_html($file) . '</option>';
-                                            }
-                                            echo '</select>';
-                                        }
-                                        ?>
-                                    </p>
-                                    <div>
-                                        <button type="button" class="button button-primary test_csv_btn">Test CSV</button>
-                                        <button type="Submit" class="button button-primary">Migrate CSV</button>
-                                        <div><b class="reloading_text"></b></div>
-                                    </div>
-                                </label>
-                            </td>
-                        </tr>
-                    </table>
-                </form>
-
-                <pre style="overflow-x: scroll;border:1px solid red;padding:10px;display:none" class="csv_viewer"></pre>
-            <?php
-            }
-            ?>
-        </div>
+        <?php
+        migration_form_render('Data Migration CSV', $csv_folder_path, 'csv');
+        migration_form_render('Data Migration JSON', $json_folder_path, 'json');
+        ?>
     </div>
 <?php
 }
