@@ -20,6 +20,7 @@ defined('ABSPATH') || exit;
 require_once plugin_dir_path(__FILE__) . 'includes/helper-function.php';
 require_once plugin_dir_path(__FILE__) . 'includes/ajax/helper-ajax.php';
 require_once plugin_dir_path(__FILE__) . 'includes/ajax/csv-migration.php';
+require_once plugin_dir_path(__FILE__) . 'includes/ajax/user-ajax.php';
 
 /**
  * CSS and JS added
@@ -80,8 +81,9 @@ function data_migration_content()
             <div style="margin-top: 50px;">
                 <h3>User Migration</h3>
                 <form action="" class="user_migration_form">
-                    <button type="button" class="button button-primary">Create Column</button>
-                    <button type="button" class="button button-primary">Migrate User</button>
+                    <button type="button" class="button button-primary create_user_column_btn">Create Column</button>
+                    <button type="button" class="button button-primary migrate_user_btn">Migrate User</button>
+                    <div><b class="reloading_text"></b></div>
                 </form>
             </div>
         <?php

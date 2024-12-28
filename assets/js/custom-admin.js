@@ -169,6 +169,9 @@ jQuery(document).ready(function ($) {
       error: function (error) {
         console.error("Error:", error);
       },
+      complete: function () {
+        isAjaxRunning = false;
+      },
     });
   });
 
@@ -201,6 +204,87 @@ jQuery(document).ready(function ($) {
         },
         error: function (error) {
           alert("An unexpected error occurred.");
+        },
+        complete: function () {
+          isAjaxRunning = false;
+        },
+      });
+    }
+  });
+
+  // create user column
+  $(document).on("click", ".create_user_column_btn", function (e) {
+    e.preventDefault();
+    var t = $(this);
+    t.closest(".user_migration_form")
+      .find(".reloading_text")
+      .html(
+        `<span style="color:red;">Column Creating... This will take time, Don't Close this window or browser</span>`
+      );
+    t.text("Creating...");
+    isAjaxRunning = true;
+    $.ajax({
+      type: "POST",
+      url: dataAjax.ajaxurl,
+      data: {
+        action: "create_user_column_handler",
+      },
+      success: function (response) {
+        if (response.success) {
+          t.closest(".user_migration_form")
+            .find(".reloading_text")
+            .html(
+              `<span style="color:green;">Column Created Successfully <u><a href="">Reload Window</a></u></span>`
+            );
+          t.text("Create Column");
+          isAjaxRunning = false;
+          location.reload();
+        }
+      },
+      error: function (error) {
+        console.log(error);
+      },
+      complete: function () {
+        isAjaxRunning = false;
+      },
+    });
+  });
+  // user migrate js
+  $(document).on("click", ".migrate_user_btn", function (e) {
+    e.preventDefault();
+    var t = $(this);
+    if (confirm("⚠️ Please backup your database before migrating users.")) {
+      t.closest(".user_migration_form")
+        .find(".reloading_text")
+        .html(
+          `<span style="color:red;">User Migrating... This will take time, Don't Close this window or browser</span>`
+        );
+      t.text("Migrating...");
+      isAjaxRunning = true;
+      $.ajax({
+        type: "POST",
+        url: dataAjax.ajaxurl,
+        data: {
+          action: "migrate_user_handler",
+        },
+        success: function (response) {
+          console.log(response);
+          if (response.success) {
+            t.closest(".user_migration_form")
+              .find(".reloading_text")
+              .html(
+                `<span style="color:green;">User Migrated Successfully <u><a href="">Reload Window</a></u></span>`
+              );
+            t.text("Migrate User");
+            isAjaxRunning = false;
+            // location.reload();
+          }
+        },
+        error: function (error) {
+          console.log(error);
+        },
+        complete: function () {
+          isAjaxRunning = false;
         },
       });
     }
